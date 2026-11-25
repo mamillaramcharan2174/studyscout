@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { ResearchSession, ResearchSessionSchema } from '../agent/types.js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { ResearchSession, ResearchSessionSchema, UploadedDocument } from '../agent/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,78 +11,215 @@ const SESSIONS_FILE = path.join(__dirname, '..', 'data', 'sessions.json');
 export class Database {
   private static sessions: Map<string, ResearchSession> = new Map();
   private static initialized = false;
+  private static supabase: SupabaseClient | null = null;
 
-  static initialize() {
+  static async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    try {
-      const dataDir = path.dirname(SESSIONS_FILE);
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
+    // 1. Check for Supabase connection
+    const supabaseUrl = process.env.SUPABASE_URL?.trim();
+    const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
 
-      if (fs.existsSync(SESSIONS_FILE)) {
-        const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
-        const list = JSON.parse(raw) as ResearchSession[];
-        for (const s of list) {
-          try {
-            const validated = ResearchSessionSchema.parse(s);
-            this.sessions.set(validated.id, validated);
-          } catch (e) {
-            console.warn(`[DB] Skipping malformed session ${s?.id}`);
+    if (supabaseUrl && supabaseKey) {
+      try {
+        this.supabase = createClient(supabaseUrl, supabaseKey);
+        console.log(`[DB] Supabase client initialized for ${supabaseUrl}`);
+
+        // Try syncing from Supabase
+        const { data: remoteSessions, error: sessErr } = await this.supabase
+          .from('research_sessions')
+          .select('*')
+          .order('updated_at', { ascending: false });
+
+        if (!sessErr && remoteSessions && remoteSessions.length > 0) {
+          // Fetch corresponding documents
+          const { data: remoteDocs } = await this.supabase
+            .from('research_documents')
+            .select('*');
+
+          const docsBySession: Record<string, UploadedDocument[]> = {};
+          if (remoteDocs) {
+            for (const d of remoteDocs) {
+              const doc: UploadedDocument = {
+                id: d.id,
+                filename: d.filename,
+                originalName: d.original_name,
+                mimeType: d.mime_type,
+                sizeBytes: Number(d.size_bytes),
+                pageCount: d.page_count,
+                extractedText: d.extracted_text,
+                chunks: d.chunks || [],
+                uploadedAt: d.uploaded_at,
+              };
+              if (!docsBySession[d.session_id]) docsBySession[d.session_id] = [];
+              docsBySession[d.session_id].push(doc);
+            }
           }
+
+          for (const row of remoteSessions) {
+            const session: ResearchSession = {
+              id: row.id,
+              title: row.title,
+              mainQuestion: row.main_question,
+              status: row.status,
+              plan: row.plan || undefined,
+              logs: row.logs || [],
+              report: row.report || undefined,
+              followUps: row.follow_ups || [],
+              documents: docsBySession[row.id] || [],
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+            };
+            this.sessions.set(session.id, session);
+          }
+          console.log(`[DB] Successfully loaded ${this.sessions.size} sessions from Supabase cloud database.`);
         }
-        console.log(`[DB] Loaded ${this.sessions.size} saved research sessions.`);
-      } else {
-        // Seed initial high-quality sample sessions for students and judges
-        this.seedSampleSessions();
-        this.persist();
+      } catch (err) {
+        console.warn('[DB] Supabase connection failed, falling back to local storage:', (err as Error).message);
       }
-    } catch (err) {
-      console.error('[DB] Initialization error:', err);
+    }
+
+    // 2. Load Local File Backup if Supabase had 0 sessions or was unavailable
+    if (this.sessions.size === 0) {
+      try {
+        const dataDir = path.dirname(SESSIONS_FILE);
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+
+        if (fs.existsSync(SESSIONS_FILE)) {
+          const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
+          const list = JSON.parse(raw) as ResearchSession[];
+          for (const s of list) {
+            try {
+              const validated = ResearchSessionSchema.parse(s);
+              this.sessions.set(validated.id, validated);
+            } catch (e) {
+              console.warn(`[DB] Skipping malformed session ${s?.id}`);
+            }
+          }
+          console.log(`[DB] Loaded ${this.sessions.size} research sessions from local storage.`);
+        } else {
+          // Seed initial high-quality sample sessions for students and judges
+          this.seedSampleSessions();
+          this.persistLocal();
+        }
+      } catch (err) {
+        console.error('[DB] Local storage error:', err);
+      }
+    }
+
+    // 3. If Supabase is connected and empty, seed sample sessions into Supabase
+    if (this.supabase && this.sessions.size > 0) {
+      try {
+        const { count } = await this.supabase
+          .from('research_sessions')
+          .select('*', { count: 'exact', head: true });
+
+        if (count === 0) {
+          console.log('[DB] Seeding sample research sessions to Supabase cloud database...');
+          for (const session of this.sessions.values()) {
+            await this.syncToSupabase(session);
+          }
+          console.log('[DB] Seeding to Supabase complete.');
+        }
+      } catch (seedErr) {
+        console.warn('[DB] Could not sync initial seed to Supabase:', seedErr);
+      }
     }
 
     this.initialized = true;
   }
 
   static getAllSessions(): ResearchSession[] {
-    this.initialize();
     return Array.from(this.sessions.values()).sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   }
 
   static getSession(id: string): ResearchSession | undefined {
-    this.initialize();
     return this.sessions.get(id);
   }
 
   static saveSession(session: ResearchSession): void {
-    this.initialize();
     session.updatedAt = new Date().toISOString();
     this.sessions.set(session.id, session);
-    this.persist();
+    this.persistLocal();
+
+    // Async sync to Supabase
+    if (this.supabase) {
+      this.syncToSupabase(session).then(undefined, (err: any) =>
+        console.warn('[DB] Supabase async sync failed:', err?.message)
+      );
+    }
   }
 
   static deleteSession(id: string): boolean {
-    this.initialize();
     const existed = this.sessions.delete(id);
     if (existed) {
-      this.persist();
+      this.persistLocal();
+      if (this.supabase) {
+        this.supabase
+          .from('research_sessions')
+          .delete()
+          .eq('id', id)
+          .then(
+            () => console.log(`[DB] Deleted session ${id} from Supabase`),
+            (err: any) => console.warn('[DB] Supabase delete failed:', err)
+          );
+      }
     }
     return existed;
   }
 
-  private static persist(): void {
+  private static persistLocal(): void {
     try {
       const list = Array.from(this.sessions.values());
       fs.writeFileSync(SESSIONS_FILE, JSON.stringify(list, null, 2), 'utf-8');
     } catch (err) {
-      console.error('[DB] Persist error:', err);
+      console.error('[DB] Local persist error:', err);
     }
   }
 
-  // Pre-seed 2 rich, realistic student research sessions
+  private static async syncToSupabase(session: ResearchSession): Promise<void> {
+    if (!this.supabase) return;
+
+    // Upsert session
+    const { error: sessErr } = await this.supabase.from('research_sessions').upsert({
+      id: session.id,
+      title: session.title,
+      main_question: session.mainQuestion,
+      status: session.status,
+      plan: session.plan || null,
+      logs: session.logs || [],
+      report: session.report || null,
+      follow_ups: session.followUps || [],
+      updated_at: session.updatedAt,
+    });
+
+    if (sessErr) {
+      console.warn('[DB] Supabase upsert session error:', sessErr);
+      return;
+    }
+
+    // Upsert documents
+    for (const doc of session.documents) {
+      await this.supabase.from('research_documents').upsert({
+        id: doc.id,
+        session_id: session.id,
+        filename: doc.filename,
+        original_name: doc.originalName,
+        mime_type: doc.mimeType,
+        size_bytes: doc.sizeBytes,
+        page_count: doc.pageCount,
+        extracted_text: doc.extractedText,
+        chunks: doc.chunks || [],
+        uploaded_at: doc.uploadedAt,
+      });
+    }
+  }
+
+  // Pre-seed 1 rich, realistic student research session
   private static seedSampleSessions() {
     const sampleSession1: ResearchSession = {
       id: 'session-crispr-demo',

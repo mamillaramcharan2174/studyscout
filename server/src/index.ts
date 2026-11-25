@@ -14,9 +14,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Initialize session store
-Database.initialize();
-
 // Middlewares
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '20mb' }));
@@ -47,7 +44,13 @@ app.get('*', (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`[StudyScout Server] Running on http://localhost:${PORT}`);
-  console.log(`[StudyScout Server] API Endpoints ready at http://localhost:${PORT}/api/`);
-});
+// Initialize session store & start server
+async function startServer() {
+  await Database.initialize();
+  app.listen(PORT, () => {
+    console.log(`[StudyScout Server] Running on http://localhost:${PORT}`);
+    console.log(`[StudyScout Server] API Endpoints ready at http://localhost:${PORT}/api/`);
+  });
+}
+
+startServer().catch(console.error);
