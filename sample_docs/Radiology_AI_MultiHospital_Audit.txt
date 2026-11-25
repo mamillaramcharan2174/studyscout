@@ -1,0 +1,16 @@
+CLINICAL AUDIT: Multi-Institutional Diagnostic Radiology AI Evaluation
+Consortium: Metropolitan Healthcare Quality Alliance
+Lead Author: Dr. Amara Okafor, MD, Director of Clinical Informatics
+Date: August 2025
+
+Abstract & Scope:
+This internal audit assessed three commercial deep learning algorithms deployed across four regional hospital emergency departments for automated triage of chest radiographs and emergent pulmonary conditions.
+
+Key Finding 1: Aggregate Diagnostic Accuracy vs Radiologist Concordance
+In controlled validation testing across 12,000 standard screening radiographs, the algorithms demonstrated an area under the ROC curve (AUC) of 0.942, with a diagnostic sensitivity of 91.5% and specificity of 89.8% for identifying acute pneumothorax and consolidated pneumonia. Senior radiologists concurred with AI triage flags in 89.4% of high-confidence classifications.
+
+Key Finding 2: Severe Demographic Performance Degradation
+When stratifying performance by patient demographic groups, significant disparities emerged. Sensitivity dropped to 74.2% in female patients over age 65 and to 71.8% in patients presenting from low-income urban community clinics. Audit revealed that training dataset distribution consisted of 82% younger male cohorts from suburban medical facilities, inducing systematic algorithmic bias.
+
+Key Finding 3: Operational Workflow Bottlenecks and Confirmatory Scan Costs
+While median door-to-image review times decreased by 22 minutes, high false-positive rates on borderline opacities triggered a 16.4% increase in secondary follow-up CT scans, increasing average per-encounter diagnostic expenditure by $340.

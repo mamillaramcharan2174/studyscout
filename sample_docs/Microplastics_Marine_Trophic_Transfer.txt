@@ -1,0 +1,16 @@
+FIELD RESEARCH STUDY: Micro- and Nanoplastic Accumulation in Coastal Estuaries
+Department of Marine Ecology & Environmental Toxicology
+Principal Investigator: Dr. Henrik Lindqvist
+Published: July 2025
+
+1. Introduction & Sampling Methodology
+Water column, sediment, and biological tissue samples were collected across 18 stations in the North Atlantic estuarine zone over a 14-month monitoring campaign. Microplastics (1 µm to 5 mm) and nanoplastics (<1 µm) were identified via micro-FTIR and Raman spectroscopy.
+
+2. Trophic Transfer Quantification
+Evidence of trophic biomagnification was observed across primary producers (phytoplankton), primary consumers (calanoid copepods), and secondary consumers (juvenile herring and flounder). Mean particle loads increased from 4.2 particles/individual in zooplankton to 38.6 particles/g wet weight in secondary teleost fish liver tissues, demonstrating a trophic transfer factor of 2.14.
+
+3. Chemical Leachate Bioavailability & Endocrine Disruption
+High concentrations of phthalate plasticizers (DEHP, DBP) and antioxidant additives (BHT) were detected in digestive gland fluids. Histological examination revealed localized gut epithelial inflammation and cellular vacuolation in 41% of examined specimens.
+
+4. Open Scientific Debates & Uncertainty
+While laboratory exposure studies using pristine spherical polystyrene beads report high cellular mortality, natural environmental particles are weathered and colonized by microbial biofilms ('plastisphere'), altering cellular uptake kinetics. Reconciling laboratory toxicity thresholds with wild environmental exposure concentrations remains a critical research frontier.

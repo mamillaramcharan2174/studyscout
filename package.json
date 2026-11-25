@@ -1,0 +1,12 @@
+{
+  "name": "studyscout",
+  "version": "1.0.0",
+  "description": "StudyScout - Autonomous AI Research & Knowledge Agent for Students",
+  "private": true,
+  "scripts": {
+    "dev:server": "npm.cmd --prefix server run dev",
+    "dev:client": "npm.cmd --prefix client run dev",
+    "build": "npm.cmd --prefix server run build && npm.cmd --prefix client run build",
+    "start": "node --import tsx server/src/index.ts"
+  }
+}

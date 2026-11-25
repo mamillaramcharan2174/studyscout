@@ -1,0 +1,15 @@
+LABORATORY AUDIT REPORT: Somatic Gene Editing Clinical Phase II
+Lead Investigator: Dr. Marcus Vance, Institute for Molecular Therapeutics
+Date: October 2025
+Trial Registration: NCT05429188
+
+Section 1: On-Target Therapeutic Efficiency
+Across 34 patient-derived CD34+ hematopoietic stem and progenitor cell lines, CRISPR-Cas9 ribonucleoproteins achieved 88.4% targeted indel formation at the BCL11A erythroid enhancer locus. Fetal hemoglobin induction was observed in 96% of surviving erythroid colonies. This mirrors phase I clinical benchmarks demonstrating substantial phenotypic correction for sickle cell and beta-thalassemia phenotypes.
+
+Section 2: Off-Target Cleavage Observations & Frequency
+Despite manufacturer claims of zero off-target cuts using high-fidelity Cas9 enzymes (HF-Cas9), unbiased CIRCLE-seq deep sequencing identified low-frequency cleavage at 14 non-homologous genomic loci. Cleavage frequencies ranged from 0.2% to 1.8%. Notably, one off-target cut site occurred within the intronic region of the proto-oncogene NRAS. While no oncogenic transformation was detected during the 120-day in vitro culture period, this finding emphasizes the necessity of longitudinal cellular surveillance.
+
+Section 3: Institutional Recommendations
+1. Establish mandatory whole-genome sequencing at 6-month intervals post-infusion.
+2. Formulate threshold safety criteria: any off-target frequency exceeding 0.5% at proto-oncogenic loci warrants immediate patient cohort pausing.
+3. Recommend transition to dual-nuclease base editors for next-generation clinical cohorts.
