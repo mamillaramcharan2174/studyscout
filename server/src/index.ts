@@ -44,13 +44,17 @@ app.get('*', (_req, res) => {
   }
 });
 
+export { app };
+
 // Initialize session store & start server
 async function startServer() {
   await Database.initialize();
-  app.listen(PORT, () => {
-    console.log(`[StudyScout Server] Running on http://localhost:${PORT}`);
-    console.log(`[StudyScout Server] API Endpoints ready at http://localhost:${PORT}/api/`);
-  });
+  if (process.env.VERCEL !== '1') {
+    app.listen(PORT, () => {
+      console.log(`[StudyScout Server] Running on http://localhost:${PORT}`);
+      console.log(`[StudyScout Server] API Endpoints ready at http://localhost:${PORT}/api/`);
+    });
+  }
 }
 
 startServer().catch(console.error);
