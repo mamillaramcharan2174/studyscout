@@ -8,14 +8,20 @@ import { DocumentParser } from '../storage/documentParser.js';
 import { AgentEngine } from '../agent/engine.js';
 import { ResearchSession, ResearchPlanSchema } from '../agent/types.js';
 
+import os from 'os';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SAMPLE_DOCS_DIR = path.join(__dirname, '..', '..', '..', 'sample_docs');
 
-// Multer upload config
-const uploadDir = path.join(__dirname, '..', '..', 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Multer upload config using os.tmpdir() for cloud serverless compatibility
+const uploadDir = path.join(os.tmpdir(), 'studyscout_uploads');
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn('[Uploads] Could not create upload directory:', e);
 }
 
 const storage = multer.diskStorage({

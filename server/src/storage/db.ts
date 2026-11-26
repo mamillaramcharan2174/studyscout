@@ -1,12 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ResearchSession, ResearchSessionSchema, UploadedDocument } from '../agent/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const SESSIONS_FILE = path.join(__dirname, '..', 'data', 'sessions.json');
+const SESSIONS_FILE = path.join(os.tmpdir(), 'studyscout_sessions.json');
 
 export class Database {
   private static sessions: Map<string, ResearchSession> = new Map();
