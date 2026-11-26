@@ -6,14 +6,12 @@ import {
   Mail,
   User,
   ArrowRight,
-  GraduationCap,
   Key,
   CheckCircle2,
   AlertCircle,
   Eye,
   EyeOff,
   Loader2,
-  ShieldCheck,
   RotateCcw,
 } from 'lucide-react';
 import { UserProfile } from '../types';
@@ -22,23 +20,16 @@ interface AuthGateProps {
   onLoginSuccess: (user: UserProfile) => void;
 }
 
-type AuthMode = 'login' | 'register' | 'forgot_password';
+type AuthMode = 'login' | 'forgot_password';
 
 export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
   const [mode, setMode] = React.useState<AuthMode>('login');
 
-  // Form Fields
+  // Sign In Form Fields
   const [identifier, setIdentifier] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
   const [rememberMe, setRememberMe] = React.useState(true);
-
-  // Register Fields
-  const [fullName, setFullName] = React.useState('');
-  const [regUsername, setRegUsername] = React.useState('');
-  const [regEmail, setRegEmail] = React.useState('');
-  const [regPassword, setRegPassword] = React.useState('');
-  const [fieldOfStudy, setFieldOfStudy] = React.useState('Biomedical & AI Engineering');
 
   // Forgot Password Fields
   const [forgotIdentifier, setForgotIdentifier] = React.useState('');
@@ -99,7 +90,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
           onLoginSuccess(fallbackUser);
           return;
         }
-        setErrorMsg(data.error || 'Invalid credentials. Please verify and try again.');
+        setErrorMsg(data.error || 'Invalid username/email or password. Please verify and try again.');
       }
     } catch (err) {
       // Local fallback for offline/sandbox
@@ -118,82 +109,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
         onLoginSuccess(fallbackUser);
         return;
       }
-      setErrorMsg('Could not connect to authentication server. Please try the demo student account.');
+      setErrorMsg('Could not connect to authentication server. Please check your connection.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 2. Handle 1-Click Demo Login
-  const handleQuickDemoLogin = (asRole: 'student' | 'researcher') => {
-    clearMessages();
-    if (asRole === 'student') {
-      setIdentifier('student@university.edu');
-      setPassword('StudyScout2026!');
-      const demoUser: UserProfile = {
-        id: 'user-alex-rivera',
-        username: 'student',
-        email: 'student@university.edu',
-        fullName: 'Alex Rivera',
-        fieldOfStudy: 'Biomedical & AI Engineering',
-      };
-      localStorage.setItem('studyscout_user', JSON.stringify(demoUser));
-      onLoginSuccess(demoUser);
-    } else {
-      setIdentifier('researcher@mit.edu');
-      setPassword('Science2026!');
-      const demoUser: UserProfile = {
-        id: 'user-samantha-vance',
-        username: 'researcher',
-        email: 'researcher@mit.edu',
-        fullName: 'Dr. Samantha Vance',
-        fieldOfStudy: 'Computational Neuroscience',
-      };
-      localStorage.setItem('studyscout_user', JSON.stringify(demoUser));
-      onLoginSuccess(demoUser);
-    }
-  };
-
-  // 3. Handle Registration
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearMessages();
-
-    if (!regUsername.trim() || !regEmail.trim() || !regPassword) {
-      setErrorMsg('Please fill in all required fields.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: fullName.trim() || regUsername.trim(),
-          username: regUsername.trim(),
-          email: regEmail.trim(),
-          password: regPassword,
-          fieldOfStudy,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.user) {
-        localStorage.setItem('studyscout_user', JSON.stringify(data.user));
-        if (data.token) localStorage.setItem('studyscout_token', data.token);
-        onLoginSuccess(data.user);
-      } else {
-        setErrorMsg(data.error || 'Registration failed. Please try a different username or email.');
-      }
-    } catch (err) {
-      setErrorMsg('Registration service currently unavailable. Please sign in with the Demo account.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 4. Handle Forgot Password - Step 1: Request Code
+  // 2. Handle Forgot Password - Step 1: Request Code
   const handleRequestResetCode = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
@@ -214,11 +136,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
       const data = await res.json();
       if (res.ok && data.code) {
         setGeneratedCode(data.code);
-        setResetCode(data.code); // Pre-fill code for effortless testing!
+        setResetCode(data.code); // Pre-fill code for effortless testing
         setResetStep('verify');
         setSuccessMsg(`Verification code generated: ${data.code}. Enter a new password below.`);
       } else {
-        // Fallback for demo student offline
         if (
           forgotIdentifier.trim().toLowerCase() === 'student' ||
           forgotIdentifier.trim().toLowerCase() === 'student@university.edu'
@@ -243,7 +164,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  // 5. Handle Forgot Password - Step 2: Set New Password
+  // 3. Handle Forgot Password - Step 2: Set New Password
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
@@ -322,7 +243,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
 
         {/* Card Box */}
         <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-xl p-6 sm:p-8 space-y-5">
-          {/* Mode Switcher Tabs */}
+          {/* Mode Switcher Tabs: Strictly Sign In & Forgot Password */}
           <div className="flex rounded-xl bg-slate-900/80 p-1 border border-slate-700/60 text-xs font-semibold">
             <button
               type="button"
@@ -337,20 +258,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
               }`}
             >
               Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                clearMessages();
-              }}
-              className={`flex-1 py-2 rounded-lg transition-all ${
-                mode === 'register'
-                  ? 'bg-teal-600 text-white shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Sign Up
             </button>
             <button
               type="button"
@@ -390,7 +297,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Student Username or University Email
+                  Username or University Email
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
@@ -399,7 +306,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
                     required
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="student@university.edu"
+                    placeholder="e.g. student or student@university.edu"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   />
                 </div>
@@ -467,153 +374,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
                   </>
                 ) : (
                   <>
-                    <span>Open Research Workspace</span>
+                    <span>Sign In</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
-
-              {/* Quick 1-Click Access for Hackathon Judges & Users */}
-              <div className="pt-3 border-t border-slate-700/70 space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                  <span>Instant 1-Click Demo Access:</span>
-                  <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('student')}
-                    className="py-2 px-2.5 rounded-lg border border-teal-800/80 bg-teal-950/40 hover:bg-teal-900/60 text-teal-300 text-xs font-semibold transition-all text-center group"
-                  >
-                    <span className="block text-[11px] font-bold text-teal-200">⚡ Demo Student</span>
-                    <span className="text-[10px] text-teal-400/80">Alex Rivera (AI Bio)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('researcher')}
-                    className="py-2 px-2.5 rounded-lg border border-slate-700 bg-slate-900/40 hover:bg-slate-700/60 text-slate-300 text-xs font-semibold transition-all text-center"
-                  >
-                    <span className="block text-[11px] font-bold text-slate-200">🔬 Lead Scholar</span>
-                    <span className="text-[10px] text-slate-400">Dr. Vance (Neuro)</span>
-                  </button>
-                </div>
-              </div>
             </form>
           )}
 
           {/* ================================================================= */}
-          {/* VIEW 2: REGISTER */}
-          {/* ================================================================= */}
-          {mode === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Rivera"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={regUsername}
-                    onChange={(e) => setRegUsername(e.target.value)}
-                    placeholder="arivera"
-                    className="w-full px-3 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Field of Study
-                  </label>
-                  <select
-                    value={fieldOfStudy}
-                    onChange={(e) => setFieldOfStudy(e.target.value)}
-                    className="w-full px-2.5 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="Biomedical & AI Engineering">Biomedical & AI</option>
-                    <option value="Computer Science & ML">Computer Science & ML</option>
-                    <option value="Environmental & Climate Science">Environmental Science</option>
-                    <option value="Physics & Quantum Systems">Physics & Energy</option>
-                    <option value="Economics & Quantitative Policy">Economics & Policy</option>
-                    <option value="History & Humanities">Humanities & Law</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  University Email
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                  <input
-                    type="email"
-                    required
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="student@university.edu"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Create Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                  <input
-                    type="password"
-                    required
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full pl-10 pr-4 py-2 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white shadow-lg shadow-teal-600/20 flex items-center justify-center gap-2 transition-all mt-2"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Creating account...</span>
-                  </>
-                ) : (
-                  <>
-                    <GraduationCap className="w-4 h-4" />
-                    <span>Create Student Account</span>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* ================================================================= */}
-          {/* VIEW 3: FORGOT PASSWORD */}
+          {/* VIEW 2: FORGOT PASSWORD */}
           {/* ================================================================= */}
           {mode === 'forgot_password' && (
             <div className="space-y-4">
@@ -624,7 +394,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
                 </h3>
                 <p className="text-xs text-slate-400">
                   {resetStep === 'request'
-                    ? 'Enter your student username or email to generate a verified reset code.'
+                    ? 'Enter your username or email to generate a verified reset code.'
                     : 'Enter the verification code and set your new password.'}
                 </p>
               </div>
@@ -642,7 +412,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onLoginSuccess }) => {
                         required
                         value={forgotIdentifier}
                         onChange={(e) => setForgotIdentifier(e.target.value)}
-                        placeholder="student@university.edu or student"
+                        placeholder="e.g. student or student@university.edu"
                         className="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
                       />
                     </div>
