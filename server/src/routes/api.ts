@@ -39,6 +39,16 @@ const upload = multer({
 
 export const apiRouter = express.Router();
 
+// Ensure Database is initialized before handling any route (critical for serverless lambdas)
+apiRouter.use(async (_req, _res, next) => {
+  try {
+    await Database.initialize();
+  } catch (err) {
+    console.warn('[API] Database init notice:', err);
+  }
+  next();
+});
+
 // ============================================================================
 // 1. Session Management Routes
 // ============================================================================
