@@ -20,11 +20,14 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Health check
-const healthHandler = (_req: express.Request, res: express.Response) => {
+const healthHandler = async (_req: express.Request, res: express.Response) => {
+  await Database.initialize();
   res.json({
     status: 'ok',
     service: 'StudyScout Research Agent Server',
     version: '1.0.0',
+    hasSupabase: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY,
+    sessionsCount: Database.getAllSessions().length,
     timestamp: new Date().toISOString(),
   });
 };

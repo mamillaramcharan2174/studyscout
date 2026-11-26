@@ -12,124 +12,130 @@ const SESSIONS_FILE = path.join(os.tmpdir(), 'studyscout_sessions.json');
 export class Database {
   private static sessions: Map<string, ResearchSession> = new Map();
   private static initialized = false;
+  private static initPromise: Promise<void> | null = null;
   private static supabase: SupabaseClient | null = null;
 
-  static async initialize(): Promise<void> {
-    if (this.initialized) return;
+  static initialize(): Promise<void> {
+    if (this.initialized) return Promise.resolve();
+    if (this.initPromise) return this.initPromise;
 
-    // 1. Check for Supabase connection
-    const supabaseUrl = process.env.SUPABASE_URL?.trim();
-    const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
+    this.initPromise = (async () => {
+      // 1. Check for Supabase connection
+      const supabaseUrl = process.env.SUPABASE_URL?.trim();
+      const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim();
 
-    if (supabaseUrl && supabaseKey) {
-      try {
-        this.supabase = createClient(supabaseUrl, supabaseKey);
-        console.log(`[DB] Supabase client initialized for ${supabaseUrl}`);
+      if (supabaseUrl && supabaseKey) {
+        try {
+          this.supabase = createClient(supabaseUrl, supabaseKey);
+          console.log(`[DB] Supabase client initialized for ${supabaseUrl}`);
 
-        // Try syncing from Supabase
-        const { data: remoteSessions, error: sessErr } = await this.supabase
-          .from('research_sessions')
-          .select('*')
-          .order('updated_at', { ascending: false });
+          // Try syncing from Supabase
+          const { data: remoteSessions, error: sessErr } = await this.supabase
+            .from('research_sessions')
+            .select('*')
+            .order('updated_at', { ascending: false });
 
-        if (!sessErr && remoteSessions && remoteSessions.length > 0) {
-          // Fetch corresponding documents
-          const { data: remoteDocs } = await this.supabase
-            .from('research_documents')
-            .select('*');
+          if (!sessErr && remoteSessions && remoteSessions.length > 0) {
+            // Fetch corresponding documents
+            const { data: remoteDocs } = await this.supabase
+              .from('research_documents')
+              .select('*');
 
-          const docsBySession: Record<string, UploadedDocument[]> = {};
-          if (remoteDocs) {
-            for (const d of remoteDocs) {
-              const doc: UploadedDocument = {
-                id: d.id,
-                filename: d.filename,
-                originalName: d.original_name,
-                mimeType: d.mime_type,
-                sizeBytes: Number(d.size_bytes),
-                pageCount: d.page_count,
-                extractedText: d.extracted_text,
-                chunks: d.chunks || [],
-                uploadedAt: d.uploaded_at,
+            const docsBySession: Record<string, UploadedDocument[]> = {};
+            if (remoteDocs) {
+              for (const d of remoteDocs) {
+                const doc: UploadedDocument = {
+                  id: d.id,
+                  filename: d.filename,
+                  originalName: d.original_name,
+                  mimeType: d.mime_type,
+                  sizeBytes: Number(d.size_bytes),
+                  pageCount: d.page_count,
+                  extractedText: d.extracted_text,
+                  chunks: d.chunks || [],
+                  uploadedAt: d.uploaded_at,
+                };
+                if (!docsBySession[d.session_id]) docsBySession[d.session_id] = [];
+                docsBySession[d.session_id].push(doc);
+              }
+            }
+
+            for (const row of remoteSessions) {
+              const session: ResearchSession = {
+                id: row.id,
+                title: row.title,
+                mainQuestion: row.main_question,
+                status: row.status,
+                plan: row.plan || undefined,
+                logs: row.logs || [],
+                report: row.report || undefined,
+                followUps: row.follow_ups || [],
+                documents: docsBySession[row.id] || [],
+                createdAt: row.created_at,
+                updatedAt: row.updated_at,
               };
-              if (!docsBySession[d.session_id]) docsBySession[d.session_id] = [];
-              docsBySession[d.session_id].push(doc);
+              this.sessions.set(session.id, session);
             }
+            console.log(`[DB] Successfully loaded ${this.sessions.size} sessions from Supabase cloud database.`);
           }
-
-          for (const row of remoteSessions) {
-            const session: ResearchSession = {
-              id: row.id,
-              title: row.title,
-              mainQuestion: row.main_question,
-              status: row.status,
-              plan: row.plan || undefined,
-              logs: row.logs || [],
-              report: row.report || undefined,
-              followUps: row.follow_ups || [],
-              documents: docsBySession[row.id] || [],
-              createdAt: row.created_at,
-              updatedAt: row.updated_at,
-            };
-            this.sessions.set(session.id, session);
-          }
-          console.log(`[DB] Successfully loaded ${this.sessions.size} sessions from Supabase cloud database.`);
+        } catch (err) {
+          console.warn('[DB] Supabase connection failed, falling back to local storage:', (err as Error).message);
         }
-      } catch (err) {
-        console.warn('[DB] Supabase connection failed, falling back to local storage:', (err as Error).message);
       }
-    }
 
-    // 2. Load Local File Backup if Supabase had 0 sessions or was unavailable
-    if (this.sessions.size === 0) {
-      try {
-        const dataDir = path.dirname(SESSIONS_FILE);
-        if (!fs.existsSync(dataDir)) {
-          fs.mkdirSync(dataDir, { recursive: true });
-        }
-
-        if (fs.existsSync(SESSIONS_FILE)) {
-          const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
-          const list = JSON.parse(raw) as ResearchSession[];
-          for (const s of list) {
-            try {
-              const validated = ResearchSessionSchema.parse(s);
-              this.sessions.set(validated.id, validated);
-            } catch (e) {
-              console.warn(`[DB] Skipping malformed session ${s?.id}`);
-            }
+      // 2. Load Local File Backup if Supabase had 0 sessions or was unavailable
+      if (this.sessions.size === 0) {
+        try {
+          const dataDir = path.dirname(SESSIONS_FILE);
+          if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
           }
-          console.log(`[DB] Loaded ${this.sessions.size} research sessions from local storage.`);
-        } else {
-          // Seed initial high-quality sample sessions for students and judges
+
+          if (fs.existsSync(SESSIONS_FILE)) {
+            const raw = fs.readFileSync(SESSIONS_FILE, 'utf-8');
+            const list = JSON.parse(raw) as ResearchSession[];
+            for (const s of list) {
+              try {
+                const validated = ResearchSessionSchema.parse(s);
+                this.sessions.set(validated.id, validated);
+              } catch (e) {
+                console.warn(`[DB] Skipping malformed session ${s?.id}`);
+              }
+            }
+          } else {
+            // Seed initial high-quality sample sessions for students and judges
+            this.seedSampleSessions();
+            this.persistLocal();
+          }
+        } catch (err) {
+          console.error('[DB] Local storage error:', err);
           this.seedSampleSessions();
-          this.persistLocal();
         }
-      } catch (err) {
-        console.error('[DB] Local storage error:', err);
       }
-    }
 
-    // 3. If Supabase is connected and empty, seed sample sessions into Supabase
-    if (this.supabase && this.sessions.size > 0) {
-      try {
-        const { count } = await this.supabase
-          .from('research_sessions')
-          .select('*', { count: 'exact', head: true });
+      // 3. If Supabase is connected and empty, seed sample sessions into Supabase
+      if (this.supabase && this.sessions.size > 0) {
+        try {
+          const { count } = await this.supabase
+            .from('research_sessions')
+            .select('*', { count: 'exact', head: true });
 
-        if (count === 0) {
-          console.log('[DB] Seeding sample research sessions to Supabase cloud database...');
-          for (const session of this.sessions.values()) {
-            await this.syncToSupabase(session);
+          if (count === 0) {
+            console.log('[DB] Seeding sample research sessions to Supabase cloud database...');
+            for (const session of this.sessions.values()) {
+              await this.syncToSupabase(session);
+            }
+            console.log('[DB] Seeding to Supabase complete.');
           }
-          console.log('[DB] Seeding to Supabase complete.');
+        } catch (seedErr) {
+          console.warn('[DB] Could not sync initial seed to Supabase:', seedErr);
         }
-      } catch (seedErr) {
-        console.warn('[DB] Could not sync initial seed to Supabase:', seedErr);
       }
-    }
 
-    this.initialized = true;
+      this.initialized = true;
+    })();
+
+    return this.initPromise;
   }
 
   static getAllSessions(): ResearchSession[] {
