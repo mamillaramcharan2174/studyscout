@@ -152,3 +152,31 @@ export interface AppSettings {
   braveKey?: string;
   tavilyKey?: string;
 }
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  fullName: string;
+  fieldOfStudy: string;
+  createdAt?: string;
+}
+
+export interface QuickAnswerSource {
+  id?: string;
+  title: string;
+  url: string;
+  domain: string;
+  snippet: string;
+  author?: string;
+}
+
+export interface QuickAnswerResult {
+  question: string;
+  directAnswer: string;
+  keyTakeaways: string[];
+  relatedQuestions: string[];
+  confidence: 'high' | 'medium';
+  sources: QuickAnswerSource[];
+  answeredAt: string;
+}

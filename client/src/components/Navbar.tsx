@@ -8,31 +8,50 @@ import {
   FileDown,
   Printer,
   Sparkles,
+  Search,
+  User,
+  LogOut,
+  GraduationCap,
+  ChevronDown,
 } from 'lucide-react';
-import { ResearchSession } from '../types';
+import { ResearchSession, UserProfile } from '../types';
 
 interface NavbarProps {
   activeSession: ResearchSession | null;
+  currentUser: UserProfile | null;
   onOpenDrawer: () => void;
   onNewResearch: () => void;
   onOpenSettings: () => void;
+  onOpenQuickSearch: () => void;
+  onLogout: () => void;
   onExportMarkdown: () => void;
   onExportJSON: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeSession,
+  currentUser,
   onOpenDrawer,
   onNewResearch,
   onOpenSettings,
+  onOpenQuickSearch,
+  onLogout,
   onExportMarkdown,
   onExportJSON,
 }) => {
   const [exportOpen, setExportOpen] = React.useState(false);
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
   const handlePrint = () => {
     window.print();
     setExportOpen(false);
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
   };
 
   return (
@@ -63,7 +82,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {activeSession && (
-            <div className="hidden md:flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-4 min-w-0">
+            <div className="hidden lg:flex items-center gap-2 border-l border-slate-200 dark:border-slate-700 pl-4 min-w-0">
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
                 Current:
               </span>
@@ -89,8 +108,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Action Controls & User Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Universal Search Button */}
+          <button
+            onClick={onOpenQuickSearch}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors group"
+            title="Search Any Question & Get Instant Answers"
+          >
+            <Search className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden md:inline">Search Any Question</span>
+          </button>
+
           <button
             onClick={onNewResearch}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-sm transition-colors"
@@ -162,8 +191,63 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Settings className="w-4 h-4" />
           </button>
+
+          {/* User Profile Pill & Sign Out Dropdown */}
+          {currentUser && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-teal-400 bg-slate-50/70 dark:bg-slate-800/60 transition-colors"
+              >
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-teal-600 to-emerald-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  {getInitials(currentUser.fullName)}
+                </div>
+                <div className="text-left hidden md:block">
+                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight truncate max-w-[110px]">
+                    {currentUser.fullName}
+                  </span>
+                  <span className="block text-[10px] text-teal-600 dark:text-teal-400 leading-none truncate max-w-[110px]">
+                    {currentUser.fieldOfStudy || 'Student'}
+                  </span>
+                </div>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {userMenuOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-56 rounded-xl bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 py-2 text-xs z-50 animate-in fade-in slide-in-from-top-2"
+                  onMouseLeave={() => setUserMenuOpen(false)}
+                >
+                  <div className="px-3.5 py-2 border-b border-slate-100 dark:border-slate-700 space-y-0.5">
+                    <p className="font-bold text-slate-900 dark:text-slate-100">
+                      {currentUser.fullName}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {currentUser.email}
+                    </p>
+                    <p className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+                      🎓 {currentUser.fieldOfStudy}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 font-medium transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
   );
 };
+export default Navbar;

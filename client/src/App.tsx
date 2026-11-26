@@ -1,4 +1,5 @@
 import React from 'react';
+import { AuthGate } from './components/AuthGate';
 import { Navbar } from './components/Navbar';
 import { SessionDrawer } from './components/SessionDrawer';
 import { SettingsModal } from './components/SettingsModal';
@@ -8,15 +9,27 @@ import { PlanStage } from './components/PlanStage';
 import { AgentTraceView } from './components/AgentTraceView';
 import { ReportView } from './components/ReportView';
 import { FollowUpChat } from './components/FollowUpChat';
+import { QuickSearchModal } from './components/QuickSearchModal';
 import {
   ResearchSession,
   ResearchPlan,
   Citation,
   AppSettings,
   ToolExecutionLog,
+  UserProfile,
 } from './types';
 
 export const App: React.FC = () => {
+  // User Authentication State
+  const [currentUser, setCurrentUser] = React.useState<UserProfile | null>(() => {
+    try {
+      const stored = localStorage.getItem('studyscout_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
   // Application State
   const [sessions, setSessions] = React.useState<ResearchSession[]>([]);
   const [activeSession, setActiveSession] = React.useState<ResearchSession | null>(null);
@@ -33,6 +46,7 @@ export const App: React.FC = () => {
   // UI Modals & Drawers
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [quickSearchOpen, setQuickSearchOpen] = React.useState(false);
   const [selectedCitation, setSelectedCitation] = React.useState<Citation | null>(null);
 
   // Workflow Stages: 'input' -> 'plan' -> 'researching' -> 'report'
@@ -46,6 +60,18 @@ export const App: React.FC = () => {
 
   // Follow-up chat loading state
   const [isFollowUpLoading, setIsFollowUpLoading] = React.useState(false);
+
+  // Keyboard shortcut for Quick Search (Ctrl+K or Cmd+K)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setQuickSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // 1. Initial Load: Fetch Sessions and Sample Docs
   React.useEffect(() => {
@@ -413,14 +439,37 @@ ${r.sources.map((s) => `[${s.citationIndex}] **${s.title}** (${s.type.toUpperCas
     URL.revokeObjectURL(url);
   };
 
+  // 11. User Authentication & Quick Search Handlers
+  const handleLogout = () => {
+    localStorage.removeItem('studyscout_user');
+    localStorage.removeItem('studyscout_token');
+    setCurrentUser(null);
+  };
+
+  const handleConvertQuickSearch = (targetQuestion: string) => {
+    setQuestion(targetQuestion);
+    setStage('input');
+    if (activeSession) {
+      setActiveSession({ ...activeSession, mainQuestion: targetQuestion, title: targetQuestion });
+    }
+  };
+
+  // Auth Gate: Require login before opening research workspace
+  if (!currentUser) {
+    return <AuthGate onLoginSuccess={(user) => setCurrentUser(user)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-teal-500/20 selection:text-teal-700">
       {/* Global Navbar */}
       <Navbar
         activeSession={activeSession}
+        currentUser={currentUser}
         onOpenDrawer={() => setDrawerOpen(true)}
         onNewResearch={handleNewResearch}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenQuickSearch={() => setQuickSearchOpen(true)}
+        onLogout={handleLogout}
         onExportMarkdown={handleExportMarkdown}
         onExportJSON={handleExportJSON}
       />
@@ -438,6 +487,8 @@ ${r.sources.map((s) => `[${s.citationIndex}] **${s.title}** (${s.type.toUpperCas
             sampleDocs={sampleDocs}
             onGeneratePlan={handleGeneratePlan}
             isGeneratingPlan={isGeneratingPlan}
+            geminiKey={settings.geminiKey}
+            openaiKey={settings.openaiKey}
           />
         )}
 
@@ -496,6 +547,15 @@ ${r.sources.map((s) => `[${s.citationIndex}] **${s.title}** (${s.type.toUpperCas
           if (s) selectSession(s);
         }}
         onDeleteSession={handleDeleteSession}
+      />
+
+      {/* Universal Quick Question Search Modal */}
+      <QuickSearchModal
+        isOpen={quickSearchOpen}
+        onClose={() => setQuickSearchOpen(false)}
+        onConvertDeepResearch={handleConvertQuickSearch}
+        geminiKey={settings.geminiKey}
+        openaiKey={settings.openaiKey}
       />
 
       {/* Settings Modal */}

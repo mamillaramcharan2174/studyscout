@@ -9,11 +9,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SESSIONS_FILE = path.join(os.tmpdir(), 'studyscout_sessions.json');
 
+export interface UserRecord {
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  fieldOfStudy: string;
+  resetCode?: string;
+  resetExpiry?: number;
+  createdAt: string;
+}
+
 export class Database {
   private static sessions: Map<string, ResearchSession> = new Map();
+  private static users: Map<string, UserRecord> = new Map();
   private static initialized = false;
   private static initPromise: Promise<void> | null = null;
   private static supabase: SupabaseClient | null = null;
+  private static USERS_FILE = path.join(os.tmpdir(), 'studyscout_users.json');
 
   static initialize(): Promise<void> {
     if (this.initialized) return Promise.resolve();
@@ -131,6 +145,9 @@ export class Database {
           console.warn('[DB] Could not sync initial seed to Supabase:', seedErr);
         }
       }
+
+      // 4. Initialize Users
+      this.initUsers();
 
       this.initialized = true;
     })();
@@ -539,5 +556,163 @@ When tested in patient CD34+ stem cells, high ribonucleoprotein concentrations l
     };
 
     this.sessions.set(sampleSession1.id, sampleSession1);
+  }
+
+  // =========================================================================
+  // User Authentication & Password Recovery Methods
+  // =========================================================================
+
+  private static initUsers(): void {
+    try {
+      if (fs.existsSync(this.USERS_FILE)) {
+        const raw = fs.readFileSync(this.USERS_FILE, 'utf-8');
+        const list = JSON.parse(raw) as UserRecord[];
+        for (const u of list) {
+          if (u.id && u.username && u.email) {
+            this.users.set(u.id, u);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[DB] Could not read users file:', e);
+    }
+
+    if (this.users.size === 0) {
+      this.seedDefaultUsers();
+      this.persistUsers();
+    }
+    console.log(`[DB] Loaded ${this.users.size} user accounts.`);
+  }
+
+  static getAllUsers(): UserRecord[] {
+    return Array.from(this.users.values());
+  }
+
+  static findUserByIdentifier(identifier: string): UserRecord | undefined {
+    if (!identifier) return undefined;
+    const clean = identifier.trim().toLowerCase();
+    for (const user of this.users.values()) {
+      if (user.username.toLowerCase() === clean || user.email.toLowerCase() === clean) {
+        return user;
+      }
+    }
+    return undefined;
+  }
+
+  static findUserById(id: string): UserRecord | undefined {
+    return this.users.get(id);
+  }
+
+  static registerUser(data: {
+    username: string;
+    email: string;
+    password: string;
+    fullName: string;
+    fieldOfStudy?: string;
+  }): { success: boolean; user?: UserRecord; error?: string } {
+    const cleanUsername = data.username?.trim();
+    const cleanEmail = data.email?.trim().toLowerCase();
+
+    if (!cleanUsername || cleanUsername.length < 3) {
+      return { success: false, error: 'Username must be at least 3 characters long' };
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'A valid email address is required' };
+    }
+    if (!data.password || data.password.length < 4) {
+      return { success: false, error: 'Password must be at least 4 characters long' };
+    }
+
+    if (this.findUserByIdentifier(cleanUsername) || this.findUserByIdentifier(cleanEmail)) {
+      return { success: false, error: 'An account with that username or email already exists' };
+    }
+
+    const newUser: UserRecord = {
+      id: `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      username: cleanUsername,
+      email: cleanEmail,
+      password: data.password,
+      fullName: data.fullName?.trim() || cleanUsername,
+      fieldOfStudy: data.fieldOfStudy?.trim() || 'General Studies',
+      createdAt: new Date().toISOString(),
+    };
+
+    this.users.set(newUser.id, newUser);
+    this.persistUsers();
+    return { success: true, user: newUser };
+  }
+
+  static generateResetCode(identifier: string): { success: boolean; code?: string; email?: string; error?: string } {
+    const user = this.findUserByIdentifier(identifier);
+    if (!user) {
+      return { success: false, error: 'No student account found with that username or email' };
+    }
+
+    const code = `SCOUT-${Math.floor(1000 + Math.random() * 9000)}`;
+    user.resetCode = code;
+    user.resetExpiry = Date.now() + 15 * 60 * 1000; // 15 mins
+    this.persistUsers();
+
+    return { success: true, code, email: user.email };
+  }
+
+  static resetPassword(identifier: string, code: string, newPassword: string): { success: boolean; error?: string } {
+    const user = this.findUserByIdentifier(identifier);
+    if (!user) {
+      return { success: false, error: 'No student account found with that username or email' };
+    }
+
+    if (!user.resetCode || user.resetCode.trim().toUpperCase() !== code.trim().toUpperCase()) {
+      return { success: false, error: 'Invalid or incorrect verification reset code' };
+    }
+
+    if (user.resetExpiry && Date.now() > user.resetExpiry) {
+      return { success: false, error: 'Reset code has expired. Please request a new code.' };
+    }
+
+    if (!newPassword || newPassword.length < 4) {
+      return { success: false, error: 'New password must be at least 4 characters long' };
+    }
+
+    user.password = newPassword;
+    user.resetCode = undefined;
+    user.resetExpiry = undefined;
+    this.persistUsers();
+
+    return { success: true };
+  }
+
+  private static persistUsers(): void {
+    try {
+      const list = Array.from(this.users.values());
+      fs.writeFileSync(this.USERS_FILE, JSON.stringify(list, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[DB] Could not persist users to file:', e);
+    }
+  }
+
+  private static seedDefaultUsers(): void {
+    const defaultStudent: UserRecord = {
+      id: 'user-alex-rivera',
+      username: 'student',
+      email: 'student@university.edu',
+      password: 'StudyScout2026!',
+      fullName: 'Alex Rivera',
+      fieldOfStudy: 'Biomedical & AI Engineering',
+      createdAt: '2026-01-10T08:00:00.000Z',
+    };
+
+    const defaultResearcher: UserRecord = {
+      id: 'user-samantha-vance',
+      username: 'researcher',
+      email: 'researcher@mit.edu',
+      password: 'Science2026!',
+      fullName: 'Dr. Samantha Vance',
+      fieldOfStudy: 'Computational Neuroscience',
+      createdAt: '2026-01-12T09:00:00.000Z',
+    };
+
+    this.users.set(defaultStudent.id, defaultStudent);
+    this.users.set(defaultResearcher.id, defaultResearcher);
   }
 }
